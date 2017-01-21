@@ -13,6 +13,7 @@ var port *int = &pt
 func mapURLsToControllers(){
 	http.HandleFunc("/", controllers.RedirectUserToTwitter)
 	http.HandleFunc("/maketoken", controllers.GetTwitterToken)
+	http.HandleFunc("/percentagefavorites", controllers.GetPercentageOfFavorites)
 	u := fmt.Sprintf(":%d", *port)
 	fmt.Printf("Listening on '%s'\n", u)
 	http.ListenAndServe(u, nil)
