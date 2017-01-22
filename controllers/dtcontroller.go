@@ -4,7 +4,6 @@ import(
   "net/http"
   "fmt"
   "log"
-  //"io/ioutil"
   "reflect"
   "encoding/json"
   "net/url"
@@ -81,14 +80,27 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
 }
 
 /* Parseo los parametros de la url se los paso a la capa de services
+   Tengo que saber como van a ser los json que va a recibir para poder extraer los values
+
+
+      "Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
+      "Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
+      "screen_name":"juniorjasin",
+      "user_id":"811672150000209920",
+
+
 */
 func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
-  s := r.URL.String()
-  url, _ := url.ParseQuery(s)
+  m, _ := url.ParseQuery(r.URL.RawQuery)
+  fmt.Println("MAP:")
+  fmt.Println(m)
 
-  fmt.Println(reflect.TypeOf(url))
-  urlJson, _ := json.Marshal(url)
-  fmt.Fprintf(w,"URL:" + s + "\n ur:" + string(urlJson))
+  // obtuve un mapa de los parametros que van a venir en la url,
+  // ahora se los paso a la capa de services para que le pegue a la api
+  // de twitter y asi obtener datos y procesarlos y devolver una estructura
+  // que tengo que hacer y que debe estar implementada en la capa de model para
+  // estructurar los datos (podria ser % favs para cada persona por ej) y
+  // desde aca (capa controllers) devolver la respuesta a la app que consuma esta api
 
 }
 
