@@ -6,35 +6,28 @@ import(
   "log"
   "io/ioutil"
   "encoding/json"
-  // "reflect"
   "sort"
-  // "strings"
-  // "io"
 
   "github.com/juniorjasin/datatweet/model"
 )
 
-/*
-"Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
-"Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
-"screen_name":"juniorjasin",
-"user_id":"811672150000209920",
-*/
-
-
+/* Metodo donde comienza el proceso de calcular el porcentaje de favoritos
+ * de una cuenta. Recive un url.Values donde obtengo los paraemtros de la url
+ * que deben traer un Token y un Secret valido para poder crear un http.client
+ * y poder realizar consultas a la API de twitter
+ */
 func PercentageOfFavorites(v url.Values) model.PairList {
-
-  // ******************************* importante **************************************
-  // en GetClient debo pasarle los parametros Token y Secret para crear un nuevo cliente
-  // dentro de GetClient voy a usar GetConsumer tambien y asi crear un consumer que llame a MakeHttpClient
-  // y ahi creo un client y lo devuelvo, por ahora eso no esta hecho.
-  client := model.GetClient()
-  if client == nil{
+  // creo un nuevo cliente
+  client := model.GetClient(v)
+  if client == nil {
     fmt.Println("\n\n ****CLIENTE NO INICIALIZADO**** \n\n")
+    return nil
   }
 
+  // tomo el screen_name que debe venir en la url para saber que cuenta voy a analizar
   sn := v.Get("screen_name")
   response, err := client.Get(
+    // en count especifico la cantidad de tweets a analizar, puse el maximo (200)
 		"https://api.twitter.com/1.1/favorites/list.json?count=200&screen_name="+ sn)
 	if err != nil {
 		log.Fatal(err)
@@ -42,22 +35,27 @@ func PercentageOfFavorites(v url.Values) model.PairList {
 	defer response.Body.Close()
   bits, err := ioutil.ReadAll(response.Body)
 
-  pl := calculatePercentage(bits)
+  // una vez obtenido el response lo 'pongo' en un puntero a interface[] para parsearlo
+  var f []interface{} // tiene que ser un puntero a interface{} porque no es un solo JSON sino un array de JSON
+  err1 := json.Unmarshal(bits, &f)
+  if err1 != nil {
+    fmt.Println(err1)
+    return nil
+  }
+
+  // le paso f al metodo que devuelve una estructura PairList que es un puntero
+  // de un struct string, float64 con los porcentajes y ordenada
+  pl := calculatePercentage(f)
 
   return pl
 }
 
-func calculatePercentage(b []byte) model.PairList {
-  //*** podria pasar esto al metodo que lo llama y aca solo calcular
-  var f []interface{} // tiene que ser un puntero a interface{} porque no es un solo JSON sino un array de JSON
-  err := json.Unmarshal(b, &f)
-  if err != nil {
-    fmt.Println(err)
-    return nil
-  }
-  //***
-  fmt.Println("\n\n\n")
+//Calculo de porcentaje de favs
+func calculatePercentage(f []interface{}) model.PairList {
 
+  // Parseo el array de JSON y busco el array de 'user', donde especifica la informacion
+  // propia del usuario al que se faveo, y obtengo su screen_name (su @).
+  //  Creo un mapa donde sumo y obtengo screen_name:cantfavs y cuento la cantidad total en count
   cantNames := make(map[string]int)
   count := 0
   for _, v := range f {
@@ -81,13 +79,8 @@ func calculatePercentage(b []byte) model.PairList {
       }
     }
   }
-  fmt.Println("\n\n\n")
-  fmt.Println("MAPA:", cantNames)
 
-  fmt.Println("\n\n\n")
-  fmt.Println("count:", count)
-
-
+// recorro el mapa obtenido y creo un nuevo mapa con screen_name:porcentaje
   percentageMap := make(map[string]float64)
   for key, _ := range cantNames {
     i := cantNames[key]
@@ -96,21 +89,14 @@ func calculatePercentage(b []byte) model.PairList {
     percentageMap[key] = p
   }
 
-  fmt.Println("\n\n\n")
-
-  pl := rankByWordCount(percentageMap)
-  // muestro el mapa de porcentaje solo para comprobar
-  for _, value := range pl {
-      fmt.Println("key:", value.Key) // nombre
-      fmt.Println("value:",value.Value) // porcentaje
-      fmt.Println(" ")
-  }
+  // SortMap ordena el mapa y lo mete en el type PairList
+  pl := SortMap(percentageMap)
 
   return pl
 }
 
 // ordena el mapa con los valores y devuelve un puntero a una estructura Pair con su clave y valor
-func rankByWordCount(wordFrequencies map[string]float64) model.PairList{
+func SortMap(wordFrequencies map[string]float64) model.PairList{
   pl := make(model.PairList, len(wordFrequencies))
   i := 0
   for k, v := range wordFrequencies {

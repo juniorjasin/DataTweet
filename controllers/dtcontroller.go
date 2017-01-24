@@ -4,7 +4,6 @@ import(
   "net/http"
   "fmt"
   "log"
-  "reflect"
   "encoding/json"
   //"net/url"
 
@@ -17,8 +16,11 @@ var tokensAux map[string]*oauth.RequestToken
 var finalToken *oauth.AccessToken // lo guardo al pedo
 var prueba string
 
-// metodo que redirije al usuario para que acepte los permisos
-// siguiente el estandar oauth1.0 de twitter
+/* Se llama a este metodo cuando llega un request a localhost:8888
+ * metodo redirije al usuario para que acepte los permisos
+ * siguiendo el estandar oauth1.0 de twitter. Utilizo la libreria "github.com/mrjones/oauth"
+ * para realizarlo porque Go solo tiene el package oauth2 para oauth 2.0
+ */
 func RedirectUserToTwitter(w http.ResponseWriter, r *http.Request) {
   var c *oauth.Consumer
   var tokens map[string]*oauth.RequestToken
@@ -34,7 +36,10 @@ func RedirectUserToTwitter(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, requestUrl, http.StatusTemporaryRedirect)
 }
 
-// obtengo el accessToken luego de que se acceptaran los permisos
+/* Automaticamente luego de que se aceptaron los permisos, se llama a este metodo,
+ * donde se crea el AccessToken, con el que se crea un *http.Client, donde lo guardo
+ * para luego mandarle request a la API de twitter
+ */
 func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
   var c *oauth.Consumer
   var tokens map[string]*oauth.RequestToken
@@ -50,16 +55,10 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
 	}
 
-  fmt.Println("TIPO DE AccessToken:")
-  fmt.Println(reflect.TypeOf(accessToken))
-
   client, err := c.MakeHttpClient(accessToken)
 	if err != nil {
 		log.Fatal(err)
   }
-
-  fmt.Println("TIPO DE CLIENTE")
-  fmt.Println(reflect.TypeOf(client))
 
   cli := model.SetClient(client)
   if cli == nil{
@@ -69,31 +68,13 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
   // guardo el token con el que voy a hacer consultas
   finalToken = accessToken
 
-/*
-	response, err := client.Get(
-		"https://api.twitter.com/1.1/statuses/home_timeline.json?count=1")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer response.Body.Close()
-
-
-	bits, err := ioutil.ReadAll(response.Body)
-  fmt.Printf("\ntipo de variable bits:")
-  reflect.TypeOf(bits)
-  //*/
-
-//  fmt.Fprintf(w, accessToken.Token) // aca respongo el accessToken
-
   // *************** CREO QUE NO NECESITO ESTO SI ES QUE YA TENGO EL CLIENTE *********************
   bits2, err := json.Marshal(accessToken)
   if err != nil{
     log.Fatal(err)
   }
-  fmt.Println("TIPO DEL ACCESSTOKEN")
-  fmt.Println(reflect.TypeOf(accessToken))
-  // retorno el json. Con este metodo veo la respuesta en el navegador
-  fmt.Fprintf(w, "json de respuesta:" + string(bits2))
+  // Con este metodo visualizo la respuesta en el navegador, retorna el json con el token
+  fmt.Fprintf(w, string(bits2))
 }
 
 
@@ -111,20 +92,29 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
       "AdditionalData":{"screen_name":"EsJorgito","user_id":"2439545395","x_auth_expires":"0"}}
 */
 
-// obtuve un mapa de los parametros que van a venir en la url,
-// ahora se los paso a la capa de services para que le pegue a la api
-// de twitter y asi obtener datos y procesarlos y devolver una estructura
-// que tengo que hacer y que debe estar implementada en la capa de model para
-// estructurar los datos (podria ser % favs para cada persona por ej) y
-// desde aca (capa controllers) devolver la respuesta a la app que consuma esta api
+/*
+ * obtuve un mapa de los parametros que van a venir en la url,
+ * ahora se los paso a la capa de services para que le pegue a la api
+ * de twitter y asi obtener datos y procesarlos y devolver una estructura
+ * que tengo que hacer y que debe estar implementada en la capa de model para
+ * estructurar los datos (podria ser % favs para cada persona por ej) y
+ * desde aca (capa controllers) devolver la respuesta a la app que consuma esta api
+*/
+
+/* url_mappings llama a este metodo cuando llega un request a /GetPercentageOfFavorites
+ * Primero se obtienen los paraemtros de la url y se los paso a la capa de services.
+ * Luego Respondo los primeros 10 resultados que ya vienen ordenados
+ */
 func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
   pl := services.PercentageOfFavorites(values)
+  if pl == nil {
+    fmt.Fprintf(w, "ERROR FALTAN PARAMETROS: Token y/o Secret...") // nombre
+  }
 
   i := 0
   for _, value := range pl {
       if i > 9 { break }
-
       fmt.Fprintf(w, value.Key +" ") // nombre
       fmt.Fprintf(w, "%.2f", value.Value) // porcentaje
       fmt.Fprintf(w,"%v", "%")
@@ -133,16 +123,16 @@ func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
   }
 }
 
+/* DATOS IVAN:
 
+{"Token":"635962800-h2aiHePot0uqEJzals0zPuSnLV0S6y2mvIRuoAKI",
+"Secret":"72WCC1YKW2pXOZDdNNgw1U4aYJMqLRWXxPccwoNKp9JHR",
+"AdditionalData":{"screen_name":"Ds_Ivan_Gs","user_id":"635962800","x_auth_expires":"0"}}
 
-
-
-
-
-
-
-
-
-
-
-//
+DATOS juniorjasin
+/*
+"Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
+"Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
+"screen_name":"juniorjasin",
+"user_id":"811672150000209920",
+*/
