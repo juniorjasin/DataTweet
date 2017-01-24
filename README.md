@@ -1,3 +1,3 @@
 # DataTweet
 
-provee estadisticas sobre tus tweets y mejora tu experiencia en twitter
+Provee estadisticas sobre tus tweets y mejora tu experiencia en twitter
