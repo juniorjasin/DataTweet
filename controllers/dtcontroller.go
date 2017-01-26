@@ -123,6 +123,29 @@ func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
   }
 }
 
+func ImagesOnTimeline(w http.ResponseWriter, r *http.Request){
+  values := r.URL.Query()
+// obtengo un cliente
+  client := model.GetClient(values)
+  if client == nil {
+    fmt.Println("\n\n ****CLIENTE NO INICIALIZADO**** \n\n")
+  }
+
+  urls := services.GetImages(client, values)
+
+
+  // print de las urls y el usuario que subio el contenido en forma cronologica
+  for _, urlname := range urls {
+    fmt.Fprintf(w, string(urlname.Url))
+    fmt.Fprintf(w," - ")
+    fmt.Fprintf(w, string(urlname.Screen_name)+"\n")
+  }
+
+  // printeo las imagenes
+
+
+}
+
 /* DATOS IVAN:
 
 {"Token":"635962800-h2aiHePot0uqEJzals0zPuSnLV0S6y2mvIRuoAKI",
@@ -130,9 +153,15 @@ func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
 "AdditionalData":{"screen_name":"Ds_Ivan_Gs","user_id":"635962800","x_auth_expires":"0"}}
 
 DATOS juniorjasin
-/*
-"Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
+
+{"Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
 "Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
-"screen_name":"juniorjasin",
-"user_id":"811672150000209920",
+"AdditionalData":{"screen_name":"juniorjasin","user_id":"811672150000209920","x_auth_expires":"0"}}
+
+EsJorgito
+{"Token":"2439545395-84074Ec8VsIXygKaUdt58mobvBNvE8A4Bu5ZTZq",
+"Secret":"qP837ZmljgyJoRVWJyRS1ujzf2EwR3x2BOxeIeLyLJJmb",
+"AdditionalData":{"screen_name":"EsJorgito","user_id":"2439545395","x_auth_expires":"0"}}
+
+
 */

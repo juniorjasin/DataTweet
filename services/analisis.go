@@ -17,7 +17,7 @@ import(
  * y poder realizar consultas a la API de twitter
  */
 func PercentageOfFavorites(v url.Values) model.PairList {
-  // creo un nuevo cliente
+  // creo un nuevo cliente  ****** esto podria estar en controllers porque tiene que ver con la parte de como llegan los datos
   client := model.GetClient(v)
   if client == nil {
     fmt.Println("\n\n ****CLIENTE NO INICIALIZADO**** \n\n")
@@ -34,6 +34,8 @@ func PercentageOfFavorites(v url.Values) model.PairList {
 	}
 	defer response.Body.Close()
   bits, err := ioutil.ReadAll(response.Body)
+
+  fmt.Println(string(bits))
 
   // una vez obtenido el response lo 'pongo' en un puntero a interface[] para parsearlo
   var f []interface{} // tiene que ser un puntero a interface{} porque no es un solo JSON sino un array de JSON
