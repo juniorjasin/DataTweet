@@ -1,10 +1,10 @@
 package model
 
 import(
-  "net/http"
-  "net/url"
   "log"
   "fmt"
+  "net/url"
+  "net/http"
 
   "github.com/mrjones/oauth"
 )
@@ -47,10 +47,6 @@ func SetClient(cli *http.Client)(*http.Client) {
 /* Con el token y secret que vienen en la url puedo crear un ouath.AccessToken
  * que luego de obtener un consumer con GetConsumer() puedo crear un http.Client
  * que lo retorno. En caso de que falten parametros o sean incorrectos, el metodo retorna nil
-
-@issue: si se reciben parametros correctos(token y secret) que son de un usuario que no es el mio pero que
-        ya esta autorizado, la API responde con la consulta.
-        --> Ver forma de que esto no suceda.
  */
 func GetClient(v url.Values) *http.Client {
   c,_ := GetConsumer()
@@ -72,15 +68,3 @@ func GetClient(v url.Values) *http.Client {
 
   return client
 }
-
-// tipos y metodos para ordenar mapa
-type Pair struct {
-  Key string
-  Value float64
-}
-
-type PairList []Pair
-
-func (p PairList) Len() int { return len(p) }
-func (p PairList) Less(i, j int) bool { return p[i].Value < p[j].Value }
-func (p PairList) Swap(i, j int){ p[i], p[j] = p[j], p[i] }

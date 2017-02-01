@@ -1,12 +1,12 @@
 package controllers
 
 import(
-  "net/http"
   "fmt"
   "log"
-  "encoding/json"
   "strconv"
-  //"net/url"
+  "net/url"
+  "net/http"
+  "encoding/json"
 
   "github.com/mrjones/oauth"
   "github.com/juniorjasin/datatweet/model"
@@ -14,7 +14,6 @@ import(
 )
 // variable auxiliar para no perder el valor de tokens
 var tokensAux map[string]*oauth.RequestToken
-var finalToken *oauth.AccessToken // lo guardo al pedo
 var prueba string
 
 /* Se llama a este metodo cuando llega un request a localhost:8888
@@ -30,6 +29,10 @@ func RedirectUserToTwitter(w http.ResponseWriter, r *http.Request) {
 	tokenUrl := fmt.Sprintf("http://%s/maketoken", r.Host)
 	token, requestUrl, err := c.GetRequestTokenAndUrl(tokenUrl)
 	if err != nil {
+    err := model.Error{Code: http.StatusServiceUnavailable, Message: "Servicio no disponible. Problemas en la conexion"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
 		log.Fatal(err)
 	}
 	// Make sure to save the token, we'll need it for AuthorizeToken()
@@ -46,15 +49,8 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
   var tokens map[string]*oauth.RequestToken
   c, tokens = model.GetConsumer()
   tokens = tokensAux
-
-	values := r.URL.Query()
-	verificationCode := values.Get("oauth_verifier")
-	tokenKey := values.Get("oauth_token")
-
-	accessToken, err := c.AuthorizeToken(tokens[tokenKey], verificationCode)
-	if err != nil {
-		log.Fatal(err)
-	}
+  values := r.URL.Query()
+  accessToken := getAccessToken(values, c, tokens)
 
   client, err := c.MakeHttpClient(accessToken)
 	if err != nil {
@@ -66,107 +62,90 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
     log.Fatal(cli)
   }
 
-  // guardo el token con el que voy a hacer consultas
-  finalToken = accessToken
-
-  // *************** CREO QUE NO NECESITO ESTO SI ES QUE YA TENGO EL CLIENTE *********************
-  bits2, err := json.Marshal(accessToken)
+  jsonToken, err := json.Marshal(accessToken)
   if err != nil{
     log.Fatal(err)
   }
-  // Con este metodo visualizo la respuesta en el navegador, retorna el json con el token
-  fmt.Fprintf(w, string(bits2))
+  // Retorno el json con token, secret y AdditionalData con screen_name del que solicito, user_id y x_auth_expires
+  fmt.Fprintf(w, string(jsonToken))
 }
 
-/* Parseo los parametros de la url se los paso a la capa de services
-   Tengo que saber como van a ser los json que va a recibir para poder extraer los values
+// obtengo el access token
+func getAccessToken(values url.Values, c *oauth.Consumer, tokens map[string]*oauth.RequestToken) *oauth.AccessToken {
+	verificationCode := values.Get("oauth_verifier")
+	tokenKey := values.Get("oauth_token")
 
+	accessToken, err := c.AuthorizeToken(tokens[tokenKey], verificationCode)
+	if err != nil {
+		log.Fatal(err)
+	}
+  return accessToken
+}
 
-      "Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
-      "Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
-      "screen_name":"juniorjasin",
-      "user_id":"811672150000209920",
-
-      "Token":"2439545395-84074Ec8VsIXygKaUdt58mobvBNvE8A4Bu5ZTZq",
-      "Secret":"qP837ZmljgyJoRVWJyRS1ujzf2EwR3x2BOxeIeLyLJJmb",
-      "AdditionalData":{"screen_name":"EsJorgito","user_id":"2439545395","x_auth_expires":"0"}}
-*/
-/*
- * obtuve un mapa de los parametros que van a venir en la url,
- * ahora se los paso a la capa de services para que le pegue a la api
- * de twitter y asi obtener datos y procesarlos y devolver una estructura
- * que tengo que hacer y que debe estar implementada en la capa de model para
- * estructurar los datos (podria ser % favs para cada persona por ej) y
- * desde aca (capa controllers) devolver la respuesta a la app que consuma esta api
-*/
-/* url_mappings llama a este metodo cuando llega un request a /GetPercentageOfFavorites
- * Primero se obtienen los paraemtros de la url y se los paso a la capa de services.
- * Luego Respondo los primeros 10 resultados que ya vienen ordenados
- */
-func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
+// consulta metodo de analisis.go para obtener el porcentaje de favoritos y
+// devoluelve la respuesta procesada
+func Favorites(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
+  sn := values.Get("screen_name")
+  if sn == "" {
+    err := model.Error{Code: http.StatusBadRequest, Message: "falta screen_name"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+  }
   pl := services.PercentageOfFavorites(values)
   if pl == nil {
-    fmt.Fprintf(w, "ERROR FALTAN PARAMETROS: Token y/o Secret...") // nombre
+    err := model.Error{Code: http.StatusBadRequest, Message: "faltan parametros"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
   }
 
-  i := 0
-  for _, value := range pl {
-      if i > 9 { break }
-      fmt.Fprintf(w, value.Key +" ") // nombre
-      fmt.Fprintf(w, "%.2f", value.Value) // porcentaje
-      fmt.Fprintf(w,"%v", "%")
-      fmt.Fprintf(w, "\n")
-      i++
-  }
+  fav := make(services.PairList, 10)
+  for i := 0; i < 10; i++ {
+      // s64 := strconv.FormatFloat(pl[i].Value, 'f', 2, 64)
+      fav[i] = services.Pair{Key: pl[i].Key, Value: pl[i].Value}
+    }
+  json, _ := json.Marshal(fav)
+  fmt.Fprintf(w, string(json))
 }
 
-
+// consulta metodo de dictionary.go para obtener un mapa de palabras y
+// porcentaje ordenado
 func Dictionary(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
   // obtengo un cliente
   client := model.GetClient(values)
   if client == nil {
-    fmt.Println("\n\n ****CLIENTE NO INICIALIZADO**** \n\n")
+    err := model.Error{Code: http.StatusBadRequest, Message: "cliente no inicializado"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
   }
 
   sn := values.Get("screen_name")
-  if sn == " " {
-    fmt.Println("ARMAR JSON QUE RETORNE ERROR")
+  if sn == "" {
+    err := model.Error{Code: http.StatusBadRequest, Message: "falta screen_name"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
   }
   since := values.Get("since_id")
-  if since == " " {
-    fmt.Println("ARMAR JSON QUE RETORNE ERROR")
+  if since == "" {
+    err := model.Error{Code: http.StatusBadRequest, Message: "falta since_id"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
   }
 
   si, _ := strconv.Atoi(since)
-  dic := services.GetDictionary(client, sn, si)
+  pl := services.GetDictionary(client, sn, si)
 
-  fmt.Fprintf(w,"RESULTADOS: \n\n")
-  for _,v := range dic {
-    fmt.Fprintf(w, "%v",v.Key + " - ")
-    fmt.Fprintf(w, "%.2f", v.Value)
-    fmt.Fprintf(w, "%v", "%\n")
+  dic := make(services.PairList, 0)
+  for _,v := range pl {
+    dic = append(dic, services.Pair{Key: v.Key, Value: v.Value})
   }
 
+  json, _ := json.Marshal(dic)
+  fmt.Fprintf(w, string(json))
 }
-
-/* DATOS IVAN:
-
-{"Token":"635962800-h2aiHePot0uqEJzals0zPuSnLV0S6y2mvIRuoAKI",
-"Secret":"72WCC1YKW2pXOZDdNNgw1U4aYJMqLRWXxPccwoNKp9JHR",
-"AdditionalData":{"screen_name":"Ds_Ivan_Gs","user_id":"635962800","x_auth_expires":"0"}}
-
-DATOS juniorjasin
-
-{"Token":"811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16",
-"Secret":"p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv",
-"AdditionalData":{"screen_name":"juniorjasin","user_id":"811672150000209920","x_auth_expires":"0"}}
-
-EsJorgito
-{"Token":"2439545395-84074Ec8VsIXygKaUdt58mobvBNvE8A4Bu5ZTZq",
-"Secret":"qP837ZmljgyJoRVWJyRS1ujzf2EwR3x2BOxeIeLyLJJmb",
-"AdditionalData":{"screen_name":"EsJorgito","user_id":"2439545395","x_auth_expires":"0"}}
-
-
-*/

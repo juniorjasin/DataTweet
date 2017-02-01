@@ -15,7 +15,7 @@ func mapURLsToControllers(){
 	http.HandleFunc("/", controllers.RedirectUserToTwitter)
 	http.HandleFunc("/maketoken", controllers.GetTwitterToken)
 	// calculo porcentaje de favs por persona
-	http.HandleFunc("/percentagefavorites", controllers.GetPercentageOfFavorites)
+	http.HandleFunc("/favorites", controllers.Favorites)
 	// image scanning of followings
 	http.HandleFunc("/dictionary", controllers.Dictionary)
 	u := fmt.Sprintf(":%d", *port)

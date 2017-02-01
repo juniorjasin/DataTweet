@@ -3,7 +3,6 @@ package services
 import(
   "fmt"
   "log"
-  "reflect"
   "strconv"
   "strings"
   "unicode"
@@ -19,8 +18,8 @@ var greaterId float64
 
 // metodo principal que retorna el diccionario con palabras y porcentaje
 func GetDictionary(client *http.Client, sn string, si int) PairList {
-  bits := getResponse(client, si, sn)
-  json := getJson(bits)
+  bits := getResponseDic(client, si, sn)
+  json := getJsonDic(bits)
   tweets := getTweets(json)
   dic := getMostUsedWords(tweets)
 
@@ -28,7 +27,7 @@ func GetDictionary(client *http.Client, sn string, si int) PairList {
 }
 
 // obtengo el response segun el valor de si
-func getResponse(client *http.Client, si int, sn string) []byte{
+func getResponseDic(client *http.Client, si int, sn string) []byte{
   var bits []byte
 
   switch si {
@@ -36,7 +35,7 @@ func getResponse(client *http.Client, si int, sn string) []byte{
     // quiere decir que no obtuve since_id como parametro en la url
     response, err := client.Get(
       // en count especifico la cantidad de tweets a analizar, puse el maximo (200)
-  		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=2&screen_name="+ sn)
+  		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=20&screen_name="+ sn)
   	if err != nil {
   		log.Fatal(err)
   	}
@@ -48,7 +47,7 @@ func getResponse(client *http.Client, si int, sn string) []byte{
     // obtuve un since_id en la url y lo utilizo en la consulta a la api
       sid := strconv.Itoa(si)
       response, err := client.Get(
-    		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=2&screen_name="+ sn +
+    		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=20&screen_name="+ sn +
         "&since_id="+ sid)
     	if err != nil {
     		log.Fatal(err)
@@ -62,13 +61,14 @@ func getResponse(client *http.Client, si int, sn string) []byte{
 }
 
 // Hago unamarshal del json y verifico que sea correcto
-func getJson(bits []byte) []interface {}{
+func getJsonDic(bits []byte) []interface {}{
   // una vez obtenido el response lo 'pongo' en un puntero a interface[] para parsearlo
   var f []interface{} // tiene que ser un puntero a interface{} porque no es un solo JSON sino un array de JSON
   err1 := json.Unmarshal(bits, &f)
   if err1 != nil {
     fmt.Println(err1)
   }
+
   return f
 }
 
@@ -94,17 +94,11 @@ func getTweets(f []interface{}) []string {
     }
   }
 
-  fmt.Println("TIPO:", reflect.TypeOf(tweet), "\n\n")
-  for i,v := range tweet{
-    fmt.Println("tweet [",i,"]:", v)
-  }
-
   return tweet
 }
 
 // obtengo las palabras mas utilizadas del array de palabras que viene
 func getMostUsedWords(tweets []string) PairList {
-
   words := getWords(tweets)
   mapWords, count := getWordsFrequency(words)
   dic := getWordsPercentage(mapWords, count)
