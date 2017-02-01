@@ -5,6 +5,7 @@ import(
   "fmt"
   "log"
   "encoding/json"
+  "strconv"
   //"net/url"
 
   "github.com/mrjones/oauth"
@@ -77,7 +78,6 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
   fmt.Fprintf(w, string(bits2))
 }
 
-
 /* Parseo los parametros de la url se los paso a la capa de services
    Tengo que saber como van a ser los json que va a recibir para poder extraer los values
 
@@ -91,7 +91,6 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
       "Secret":"qP837ZmljgyJoRVWJyRS1ujzf2EwR3x2BOxeIeLyLJJmb",
       "AdditionalData":{"screen_name":"EsJorgito","user_id":"2439545395","x_auth_expires":"0"}}
 */
-
 /*
  * obtuve un mapa de los parametros que van a venir en la url,
  * ahora se los paso a la capa de services para que le pegue a la api
@@ -100,7 +99,6 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
  * estructurar los datos (podria ser % favs para cada persona por ej) y
  * desde aca (capa controllers) devolver la respuesta a la app que consuma esta api
 */
-
 /* url_mappings llama a este metodo cuando llega un request a /GetPercentageOfFavorites
  * Primero se obtienen los paraemtros de la url y se los paso a la capa de services.
  * Luego Respondo los primeros 10 resultados que ya vienen ordenados
@@ -123,26 +121,33 @@ func GetPercentageOfFavorites(w http.ResponseWriter, r *http.Request){
   }
 }
 
-func ImagesOnTimeline(w http.ResponseWriter, r *http.Request){
+
+func Dictionary(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
-// obtengo un cliente
+  // obtengo un cliente
   client := model.GetClient(values)
   if client == nil {
     fmt.Println("\n\n ****CLIENTE NO INICIALIZADO**** \n\n")
   }
 
-  urls := services.GetImages(client, values)
-
-
-  // print de las urls y el usuario que subio el contenido en forma cronologica
-  for _, urlname := range urls {
-    fmt.Fprintf(w, string(urlname.Url))
-    fmt.Fprintf(w," - ")
-    fmt.Fprintf(w, string(urlname.Screen_name)+"\n")
+  sn := values.Get("screen_name")
+  if sn == " " {
+    fmt.Println("ARMAR JSON QUE RETORNE ERROR")
+  }
+  since := values.Get("since_id")
+  if since == " " {
+    fmt.Println("ARMAR JSON QUE RETORNE ERROR")
   }
 
-  // printeo las imagenes
+  si, _ := strconv.Atoi(since)
+  dic := services.GetDictionary(client, sn, si)
 
+  fmt.Fprintf(w,"RESULTADOS: \n\n")
+  for _,v := range dic {
+    fmt.Fprintf(w, "%v",v.Key + " - ")
+    fmt.Fprintf(w, "%.2f", v.Value)
+    fmt.Fprintf(w, "%v", "%\n")
+  }
 
 }
 
