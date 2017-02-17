@@ -8,7 +8,8 @@ Con DataTweet podes obtener informacion sobre el top ten de porcentaje de likes 
 
 Ademas, podes obtener un diccionario con el top ten de porcentaje de las palabras mas usadas de los ultimos 200 tweets en orden descendente, haciendo un GET a /dictionary y pasando como parametros token, secret y el scren_name
 
-Ejemplo: 
+Ejemplo:
+
 -para obtener los favoritos: 
 
 http://localhost:8888/favorites?screen_name=juniorjasin&token=811672150000209920-fTCkCDAbXD9NykbRY9NheMENYHJNA16&secret=p73tL8y3RJFchHqwn9uwsRJD34NPWkiBHxX3G3q0VE1zv
