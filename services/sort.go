@@ -6,7 +6,7 @@ import(
 
 // tipos y metodos para ordenar mapa
 type Pair struct {
-  Key string `json:"nombre"`
+  Key string `json:"cadena"`
   Value float64 `json:"porcentaje"`
 }
 

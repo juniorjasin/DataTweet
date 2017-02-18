@@ -7,8 +7,6 @@ import(
   "net/http"
   "io/ioutil"
   "encoding/json"
-
-  "github.com/juniorjasin/datatweet/model"
 )
 
 /* Metodo donde comienza el proceso de calcular el porcentaje de favoritos
@@ -16,21 +14,18 @@ import(
  * que deben traer un Token y un Secret valido para poder crear un http.client
  * y poder realizar consultas a la API de twitter
  */
-func PercentageOfFavorites(v url.Values) PairList {
-  // creo un nuevo cliente  ****** esto podria estar en controllers porque tiene que ver con la parte de como llegan los datos
-  client := model.GetClient(v)
-  if client == nil {
-    fmt.Println("\n ****CLIENTE NO INICIALIZADO POR FALTA DE PARAMETROS**** \n")
-    return nil
-  }
+func PercentageOfFavorites(v url.Values, client *http.Client) (PairList,float64) {
 
   // tomo el screen_name que debe venir en la url para saber que cuenta voy a analizar
   sn := v.Get("screen_name")
   bits := getResponseFav(client, sn)
   json := getJsonFav(bits)
+  if json == nil{
+    return nil, verifyCode(bits)
+  }
   pl := calculatePercentage(json)
 
-  return pl
+  return pl, 0
 }
 
 func getResponseFav(client *http.Client, sn string) []byte {
@@ -52,6 +47,7 @@ func getJsonFav(bits []byte) []interface {}{
   err1 := json.Unmarshal(bits, &f)
   if err1 != nil {
     fmt.Println(err1)
+    return nil
   }
   return f
 }
@@ -101,19 +97,8 @@ func getPercentageMap(nc map[string]int, count int) map[string]float64 {
   for key, _ := range nc {
     i := nc[key]
     p := float64((i * 100))/ float64(count)
-    fmt.Println("\n porcentaje:",p, " screen_name:", key)
+    // fmt.Println("\n porcentaje:",p, " screen_name:", key)
     percentageMap[key] = p
   }
   return percentageMap
 }
-
-
-
-
-
-
-
-
-
-
-//

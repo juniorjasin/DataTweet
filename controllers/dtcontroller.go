@@ -3,7 +3,6 @@ package controllers
 import(
   "fmt"
   "log"
-  "strconv"
   "net/url"
   "net/http"
   "encoding/json"
@@ -24,7 +23,7 @@ var prueba string
 func RedirectUserToTwitter(w http.ResponseWriter, r *http.Request) {
   var c *oauth.Consumer
   var tokens map[string]*oauth.RequestToken
-  c, tokens = model.GetConsumer()
+  c, tokens = services.GetConsumer()
   tokensAux = tokens
 	tokenUrl := fmt.Sprintf("http://%s/maketoken", r.Host)
 	token, requestUrl, err := c.GetRequestTokenAndUrl(tokenUrl)
@@ -47,7 +46,7 @@ func RedirectUserToTwitter(w http.ResponseWriter, r *http.Request) {
 func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
   var c *oauth.Consumer
   var tokens map[string]*oauth.RequestToken
-  c, tokens = model.GetConsumer()
+  c, tokens = services.GetConsumer()
   tokens = tokensAux
   values := r.URL.Query()
   accessToken := getAccessToken(values, c, tokens)
@@ -57,7 +56,7 @@ func GetTwitterToken(w http.ResponseWriter, r *http.Request) {
 		log.Fatal(err)
   }
 
-  cli := model.SetClient(client)
+  cli := services.SetClient(client)
   if cli == nil{
     log.Fatal(cli)
   }
@@ -88,16 +87,20 @@ func Favorites(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
   sn := values.Get("screen_name")
   if sn == "" {
-    err := model.Error{Code: http.StatusBadRequest, Message: "falta screen_name"}
-    jsonError, _ := json.Marshal(err)
-    fmt.Fprintf(w, string(jsonError))
+    ResponseError(1,w)
     return
   }
-  pl := services.PercentageOfFavorites(values)
+
+  // obtengo un cliente
+  client := services.GetClient(values)
+  if client == nil {
+    ResponseError(2,w)
+    return
+  }
+
+  pl,code := services.PercentageOfFavorites(values, client)
   if pl == nil {
-    err := model.Error{Code: http.StatusBadRequest, Message: "faltan parametros"}
-    jsonError, _ := json.Marshal(err)
-    fmt.Fprintf(w, string(jsonError))
+    ResponseError(code,w)
     return
   }
 
@@ -115,31 +118,23 @@ func Favorites(w http.ResponseWriter, r *http.Request){
 func Dictionary(w http.ResponseWriter, r *http.Request){
   values := r.URL.Query()
   // obtengo un cliente
-  client := model.GetClient(values)
+  client := services.GetClient(values)
   if client == nil {
-    err := model.Error{Code: http.StatusBadRequest, Message: "cliente no inicializado"}
-    jsonError, _ := json.Marshal(err)
-    fmt.Fprintf(w, string(jsonError))
+    ResponseError(2,w)
     return
   }
 
   sn := values.Get("screen_name")
   if sn == "" {
-    err := model.Error{Code: http.StatusBadRequest, Message: "falta screen_name"}
-    jsonError, _ := json.Marshal(err)
-    fmt.Fprintf(w, string(jsonError))
-    return
-  }
-  since := values.Get("since_id")
-  if since == "" {
-    err := model.Error{Code: http.StatusBadRequest, Message: "falta since_id"}
-    jsonError, _ := json.Marshal(err)
-    fmt.Fprintf(w, string(jsonError))
+    ResponseError(1,w)
     return
   }
 
-  si, _ := strconv.Atoi(since)
-  pl := services.GetDictionary(client, sn, si)
+  pl,code := services.GetDictionary(client, sn)
+  if pl == nil{
+    ResponseError(code,w)
+    return
+  }
 
   dic := make(services.PairList, 0)
   for _,v := range pl {
@@ -148,4 +143,39 @@ func Dictionary(w http.ResponseWriter, r *http.Request){
 
   json, _ := json.Marshal(dic)
   fmt.Fprintf(w, string(json))
+}
+
+// metodo que retorna json informando cada tipo de error segun el code que viene
+func ResponseError(code float64, w http.ResponseWriter)  {
+  switch code {
+  case 89:
+    err := model.Error{Code: http.StatusBadRequest, Message: "Invalid or expired token."}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+
+  case 32:
+    err := model.Error{Code: http.StatusBadRequest, Message: "Could not authenticate you (problem with secret key)"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+
+  case 1:
+    err := model.Error{Code: http.StatusBadRequest, Message: "screen_name missing"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+
+  case 2:
+    err := model.Error{Code: http.StatusBadRequest, Message: "uninitialized client, token or secret missing"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+
+  default:
+    err := model.Error{Code: http.StatusBadRequest, Message: "Problems with parameters"}
+    jsonError, _ := json.Marshal(err)
+    fmt.Fprintf(w, string(jsonError))
+    return
+  }
 }

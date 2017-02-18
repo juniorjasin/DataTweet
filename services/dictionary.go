@@ -3,7 +3,6 @@ package services
 import(
   "fmt"
   "log"
-  "strconv"
   "strings"
   "unicode"
   "net/http"
@@ -14,48 +13,34 @@ import(
   "golang.org/x/text/unicode/norm"
 )
 
-var greaterId float64
+var greaterId float64 = 0
+var errorCode float64
 
 // metodo principal que retorna el diccionario con palabras y porcentaje
-func GetDictionary(client *http.Client, sn string, si int) PairList {
-  bits := getResponseDic(client, si, sn)
+func GetDictionary(client *http.Client, sn string) (PairList, float64) {
+
+  bits := getResponseDic(client, sn)
   json := getJsonDic(bits)
+  if json == nil{
+    return nil,verifyCode(bits)
+  }
   tweets := getTweets(json)
   dic := getMostUsedWords(tweets)
-
-  return dic
+  return dic, 0
 }
 
 // obtengo el response segun el valor de si
-func getResponseDic(client *http.Client, si int, sn string) []byte{
+func getResponseDic(client *http.Client, sn string) []byte{
   var bits []byte
 
-  switch si {
-  case 0:
-    // quiere decir que no obtuve since_id como parametro en la url
-    response, err := client.Get(
+  response, err := client.Get(
       // en count especifico la cantidad de tweets a analizar, puse el maximo (200)
-  		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=20&screen_name="+ sn)
-  	if err != nil {
-  		log.Fatal(err)
-  	}
-  	defer response.Body.Close()
-    bits, _ = ioutil.ReadAll(response.Body)
-    break
-
-  default:
-    // obtuve un since_id en la url y lo utilizo en la consulta a la api
-      sid := strconv.Itoa(si)
-      response, err := client.Get(
-    		"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=20&screen_name="+ sn +
-        "&since_id="+ sid)
-    	if err != nil {
-    		log.Fatal(err)
-    	}
-    	defer response.Body.Close()
-      bits, _ = ioutil.ReadAll(response.Body)
-      break
+  	"https://api.twitter.com/1.1/statuses/user_timeline.json?include_rts=false&count=20&screen_name="+ sn)
+  if err != nil {
+  	log.Fatal(err)
   }
+  defer response.Body.Close()
+  bits, _ = ioutil.ReadAll(response.Body)
 
   return bits
 }
@@ -67,10 +52,12 @@ func getJsonDic(bits []byte) []interface {}{
   err1 := json.Unmarshal(bits, &f)
   if err1 != nil {
     fmt.Println(err1)
+    return nil
   }
 
   return f
 }
+
 
 // obtengo un array con cada tweet, filtrando los RT, Menciones y las que contengan links, fotos, gif, etc.
 func getTweets(f []interface{}) []string {
@@ -87,6 +74,7 @@ func getTweets(f []interface{}) []string {
 
       if k2 == "text" {
         str := v2.(string)
+        // filtro los retweets y las menciones
         if !strings.Contains(str, "RT") && !strings.Contains(str, "http") && !strings.Contains(str, "@"){
           tweet = append(tweet, str)
         }
@@ -97,12 +85,13 @@ func getTweets(f []interface{}) []string {
   return tweet
 }
 
-// obtengo las palabras mas utilizadas del array de palabras que viene
+// obtengo las 10 palabras mas utilizadas del array de palabras que viene
 func getMostUsedWords(tweets []string) PairList {
   words := getWords(tweets)
   mapWords, count := getWordsFrequency(words)
   dic := getWordsPercentage(mapWords, count)
   pl := SortPairList(dic)
+  pl = pl[:10]
 
   return pl
 }
@@ -151,7 +140,7 @@ func toLowerCase(words []string)[]string  {
 // var innecesaryWords []string = []string{"tu", "el", "nosotros", "yo"}
 // metodo para filtrar pronombes y articulos en las palabras que obtuve
 func filterWords(words []string) []string {
-  innecesaryWords := []string{"tu", "el", "nosotros", "yo"}
+  innecesaryWords := []string{"tu", "el", "nosotros", "yo", "la", "los", "las", "de", "es"} //
   for i := 0; i < len(words); i++ {
     for _,s := range innecesaryWords {
       if words[i] == s {
@@ -185,7 +174,7 @@ func getWordsFrequency(words []string) (map[string]int, int) {
 func getWordsPercentage(mapWords map[string]int, count int) PairList{
   dic := make(PairList, 0)
   for word, cant := range mapWords {
-    fmt.Println("word:", word, " cant:", cant)
+    // fmt.Println("word:", word, " cant:", cant)
     per := float64((cant * 100)) / float64(count)
     dic = append(dic, Pair{word, per})
   }
